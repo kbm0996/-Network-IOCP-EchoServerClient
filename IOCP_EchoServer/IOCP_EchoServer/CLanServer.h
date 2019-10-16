@@ -7,11 +7,11 @@ CLanServer
 - int GetClientCount(...)
 - SendPacket(ClientID, Packet *)   / UINT64
 virtual void OnClientJoin(Client 정보 / ClientID / 기타등등) = 0;   < Accept 후 접속처리 완료 후 호출.
-virtual void OnClientLeave(ClientID) = 0;   	            < Disconnect 후 호출
-virtual bool OnConnectRequest(ClientIP,Port) = 0;        < accept 직후
-return false; 시 클라이언트 거부.
-return true; 시 접속 허용
-virtual void OnRecv(ClientID, CNPacket *) = 0;              < 패킷 수신 완료 후
+virtual void OnClientLeave(ClientID) = 0;   	           < Disconnect 후 호출
+virtual bool OnConnectRequest(ClientIP,Port) = 0;          < accept 직후
+	return false; 시 클라이언트 거부.
+	return true; 시 접속 허용
+virtual void OnRecv(ClientID, CNPacket *) = 0;             < 패킷 수신 완료 후
 virtual void OnSend(ClientID, int sendsize) = 0;           < 패킷 송신 완료 후
 virtual void OnWorkerThreadBegin() = 0;                    < 워커스레드 GQCS 바로 하단에서 호출
 virtual void OnWorkerThreadEnd() = 0;                      < 워커스레드 1루프 종료 후

@@ -2,7 +2,7 @@
 
 mylib::CLanServer::CLanServer()
 {
-	LOG_SET_DIR(L"LanServer");
+	
 	_bServerOn = 0;
 	_iSessionID = 0;
 	_ListenSocket = INVALID_SOCKET;
