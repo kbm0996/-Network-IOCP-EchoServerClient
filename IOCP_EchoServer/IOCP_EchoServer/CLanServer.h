@@ -82,7 +82,6 @@ namespace mylib
 		// External Call
 		bool SendPacket(UINT64 iSessionID, CNPacket *pPacket);
 		bool SendPacket_Disconnect(UINT64 iSessionID, CNPacket *pPacket);
-		bool DisconnectSession(UINT64 iSessionID);
 
 		//////////////////////////////////////////////////////////////////////////
 		// Notice
@@ -125,6 +124,7 @@ namespace mylib
 		struct stSESSION
 		{
 			stSESSION();
+			virtual ~stSESSION();
 			int			nIndex;		// 匙飘况农 贸府侩
 			UINT64		iSessionID;	// 牧刨明 贸府侩
 			SOCKET		Socket;

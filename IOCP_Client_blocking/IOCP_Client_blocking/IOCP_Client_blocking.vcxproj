@@ -19,9 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{0012B257-45A4-4FAB-920D-EFC84041ACB5}</ProjectGuid>
+    <ProjectGuid>{EEB67FC9-FD98-49BD-AE79-D4EE2C5E196B}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>IOCP_EchoServer</RootNamespace>
+    <RootNamespace>IOCP_Client_blocking</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -114,7 +114,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Disabled</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -146,18 +146,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="APIHook.cpp" />
-    <ClCompile Include="CEchoServer.cpp" />
-    <ClCompile Include="CLanServer.cpp" />
-    <ClCompile Include="CNPacket.cpp" />
-    <ClCompile Include="CrashDump.cpp" />
-    <ClCompile Include="CRingBuffer.cpp" />
-    <ClCompile Include="_main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="APIHook.h" />
-    <ClInclude Include="CEchoServer.h" />
-    <ClInclude Include="CLanServer.h" />
+    <ClInclude Include="CEchoClient.h" />
+    <ClInclude Include="CLanClient.h" />
     <ClInclude Include="CLFMemoryPool.h" />
     <ClInclude Include="CLFMemoryPool_TLS.h" />
     <ClInclude Include="CLFQueue.h" />
@@ -167,6 +158,15 @@
     <ClInclude Include="CRingBuffer.h" />
     <ClInclude Include="CSystemLog.h" />
     <ClInclude Include="_Define.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="APIHook.cpp" />
+    <ClCompile Include="CEchoClient.cpp" />
+    <ClCompile Include="CLanClient.cpp" />
+    <ClCompile Include="CNPacket.cpp" />
+    <ClCompile Include="CrashDump.cpp" />
+    <ClCompile Include="CRingBuffer.cpp" />
+    <ClCompile Include="_main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -132,7 +132,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Disabled</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -151,6 +151,7 @@
     <ClCompile Include="CNPacket.cpp" />
     <ClCompile Include="CrashDump.cpp" />
     <ClCompile Include="CRingBuffer.cpp" />
+    <ClCompile Include="CEchoClient.cpp" />
     <ClCompile Include="_main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -164,6 +165,7 @@
     <ClInclude Include="CrashDump.h" />
     <ClInclude Include="CRingBuffer.h" />
     <ClInclude Include="CSystemLog.h" />
+    <ClInclude Include="CEchoClient.h" />
     <ClInclude Include="_Define.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

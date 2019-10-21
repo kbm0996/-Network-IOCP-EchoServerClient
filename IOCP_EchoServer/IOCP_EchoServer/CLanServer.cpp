@@ -121,7 +121,6 @@ void mylib::CLanServer::Stop()
 	{
 		if (_SessionArr[i].Socket != INVALID_SOCKET)
 			ReleaseSession(&_SessionArr[i]);
-		_aligned_free(_SessionArr[i].stIO);
 	}
 	if (_SessionArr != NULL)
 	{
@@ -184,6 +183,9 @@ bool mylib::CLanServer::SendPacket(UINT64 iSessionID, CNPacket * pPacket)
 		return false;
 
 	pPacket->AddRef();
+	WORD wHeader = pPacket->GetDataSize();
+	pPacket->SetHeader_Custom((char*)&wHeader, sizeof(wHeader));
+
 	pSession->SendQ.Enqueue(pPacket);
 	SendPost(pSession);
 
@@ -198,22 +200,13 @@ bool mylib::CLanServer::SendPacket_Disconnect(UINT64 iSessionID, CNPacket * pPac
 		return false;
 
 	pPacket->AddRef();
+	WORD wHeader = pPacket->GetDataSize();
+	pPacket->SetHeader_Custom((char*)&wHeader, sizeof(wHeader));
+
 	pSession->SendQ.Enqueue(pPacket);
 	SendPost(pSession);
 
 	pSession->bSendDisconnect = true;
-
-	ReleaseSessionFree(pSession);
-	return true;
-}
-
-bool mylib::CLanServer::DisconnectSession(UINT64 iSessionID)
-{
-	stSESSION *pSession = ReleaseSessionLock(iSessionID);
-	if (pSession == nullptr)
-		return false;
-
-	shutdown(pSession->Socket, SD_BOTH);
 
 	ReleaseSessionFree(pSession);
 	return true;
@@ -706,4 +699,9 @@ mylib::CLanServer::stSESSION::stSESSION()
 	SendQ.Clear();
 	bSendFlag = FALSE;
 	iSendPacketCnt = 0;
+}
+
+mylib::CLanServer::stSESSION::~stSESSION()
+{
+	_aligned_free(stIO);
 }

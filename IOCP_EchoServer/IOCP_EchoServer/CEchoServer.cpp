@@ -18,10 +18,8 @@ void CEchoServer::OnClientJoin(UINT64 SessionID)
 {
 	mylib::CNPacket *pOnPacket = mylib::CNPacket::Alloc();
 
-	WORD wHeader = sizeof(UINT64);
 	UINT64 lData = df_PACKET_PRECODE;
 	*pOnPacket << lData;
-	pOnPacket->SetHeader_Custom((char*)&wHeader, sizeof(wHeader));
 
 	SendPacket(SessionID, pOnPacket);
 
@@ -36,9 +34,7 @@ void CEchoServer::OnRecv(UINT64 SessionID, mylib::CNPacket * pPacket)
 {
 	mylib::CNPacket *pSendPacket = mylib::CNPacket::Alloc();
 
-	WORD wHeader = pPacket->GetDataSize();
-	pSendPacket->PutData(pPacket->GetPayloadPtr(), wHeader);
-	pSendPacket->SetHeader_Custom((char*)&wHeader, sizeof(wHeader));
+	pSendPacket->PutData(pPacket->GetPayloadPtr(), pPacket->GetDataSize());
 
 	SendPacket(SessionID, pSendPacket);
 

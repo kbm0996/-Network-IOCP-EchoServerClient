@@ -14,42 +14,37 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="헤더 파일\Library">
-      <UniqueIdentifier>{e5c8f602-94ff-4c97-900a-5a157248421b}</UniqueIdentifier>
+      <UniqueIdentifier>{3aaf3e57-402c-4e58-9802-1c52ea9a88fa}</UniqueIdentifier>
     </Filter>
     <Filter Include="헤더 파일\Library\CBuffer">
-      <UniqueIdentifier>{17bccacb-1574-4094-93d4-ff5fa806a9ae}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\Library\CNetwork">
-      <UniqueIdentifier>{238a16dc-ed1c-4e95-89d6-f2fd65056df9}</UniqueIdentifier>
+      <UniqueIdentifier>{5792c68a-aaa8-49cf-9ae7-721ae938725c}</UniqueIdentifier>
     </Filter>
     <Filter Include="헤더 파일\Library\CSystem">
-      <UniqueIdentifier>{912308e8-08ba-40c8-8bee-848ec5ee838a}</UniqueIdentifier>
+      <UniqueIdentifier>{3fa600af-ead9-4337-bbb2-99cb8d30fb93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Library\CNetwork">
+      <UniqueIdentifier>{3c666696-90ce-4e78-8116-b7bbc0a75967}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="_main.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="CEchoClient.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="APIHook.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="CLanClient.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="CNPacket.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="CrashDump.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="CRingBuffer.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
+    <ClInclude Include="_Define.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="CEchoClient.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="CLanClient.h">
+      <Filter>헤더 파일\Library\CNetwork</Filter>
+    </ClInclude>
+    <ClInclude Include="APIHook.h">
+      <Filter>헤더 파일\Library\CSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="CrashDump.h">
+      <Filter>헤더 파일\Library\CSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="CSystemLog.h">
+      <Filter>헤더 파일\Library\CSystem</Filter>
+    </ClInclude>
     <ClInclude Include="CLFMemoryPool.h">
       <Filter>헤더 파일\Library\CBuffer</Filter>
     </ClInclude>
@@ -68,23 +63,28 @@
     <ClInclude Include="CRingBuffer.h">
       <Filter>헤더 파일\Library\CBuffer</Filter>
     </ClInclude>
-    <ClInclude Include="APIHook.h">
-      <Filter>헤더 파일\Library\CSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="CrashDump.h">
-      <Filter>헤더 파일\Library\CSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="CSystemLog.h">
-      <Filter>헤더 파일\Library\CSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="_Define.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="CLanClient.h">
-      <Filter>헤더 파일\Library\CNetwork</Filter>
-    </ClInclude>
-    <ClInclude Include="CEchoClient.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="CEchoClient.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CLanClient.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CNPacket.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CrashDump.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CRingBuffer.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="_main.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="APIHook.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
