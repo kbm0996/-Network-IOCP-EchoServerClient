@@ -2,10 +2,11 @@
 #include <conio.h>
 #include <iostream>
 
+bool g_bMonitor;
+
 CEchoClient g_LanServer;
 
 bool ServerControl();
-bool ServerControl(std::wstring szInput);
 
 void main()
 {
@@ -14,19 +15,17 @@ void main()
 	if(!g_LanServer.Start(df_SERVER_IP, df_SERVER_PORT, 2, true))
 		return;
 
-	WCHAR szInput[CEchoClient::en_CHATLEN_MAX];
 	while (1)
 	{
 		system("cls");
-		//g_LanServer.PrintState(MON_CLIENT_ALL);
+		
+		if(g_bMonitor)
+			g_LanServer.PrintState(MON_CLIENT_ALL);
 		
 		g_LanServer.PrintChatline();
 
-		std::wcin.getline(szInput, g_LanServer.en_CHATLEN_MAX);
-		if (!ServerControl(szInput))
+		if (!ServerControl())
 			break;
-
-		g_LanServer.reqChat(szInput);
 	}
 
 	g_LanServer.Stop();
@@ -66,20 +65,18 @@ bool ServerControl()
 				bControlMode = false;
 			}
 
+			if (L'm' == ControlKey || L'M' == ControlKey)
+			{
+				wprintf(L"Controll Lock. Press U - Control Unlock \n");
+				bControlMode = false;
+			}
+
 			if (L'q' == ControlKey || L'Q' == ControlKey)
 			{
 				return false;
 			}
 		}
 	}
-
-	return true;
-}
-
-bool ServerControl(std::wstring szInput)
-{
-	if (szInput == L"q")
-		return false;
 
 	return true;
 }

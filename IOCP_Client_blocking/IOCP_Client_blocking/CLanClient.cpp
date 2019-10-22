@@ -35,6 +35,7 @@ bool mylib::CLanClient::Start(WCHAR * wszConnectIP, int iPort, int iWorkerThread
 	WSADATA wsa;
 	if (WSAStartup(WINSOCK_VERSION, &wsa) != 0)
 	{
+		CloseHandle(_hIOCP);
 		LOG(L"SYSTEM", LOG_ERROR, L"WSAStartup() failed %d", WSAGetLastError());
 		return false;
 	}
@@ -43,6 +44,8 @@ bool mylib::CLanClient::Start(WCHAR * wszConnectIP, int iPort, int iWorkerThread
 	_pSession->Socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (_pSession->Socket == INVALID_SOCKET)
 	{
+		CloseHandle(_hIOCP);
+		WSACleanup();
 		LOG(L"SYSTEM", LOG_ERROR, L"socket() failed %d", WSAGetLastError());
 		return false;
 	}
@@ -56,6 +59,9 @@ bool mylib::CLanClient::Start(WCHAR * wszConnectIP, int iPort, int iWorkerThread
 	InetPton(AF_INET, wszConnectIP, reinterpret_cast<PVOID>(&serveraddr.sin_addr));
 	if (connect(_pSession->Socket, reinterpret_cast<sockaddr*>(&serveraddr), sizeof(serveraddr)) == SOCKET_ERROR)
 	{
+		closesocket(_pSession->Socket);
+		CloseHandle(_hIOCP);
+		WSACleanup();
 		LOG(L"SYSTEM", LOG_ERROR, L"connect() failed %d", WSAGetLastError());
 		return false;
 	}
@@ -100,29 +106,9 @@ bool mylib::CLanClient::Start(WCHAR * wszConnectIP, int iPort, int iWorkerThread
 	return true;
 }
 
-void mylib::CLanClient::Stop(bool bReconnect)
+void mylib::CLanClient::Stop()
 {
 	_bConnect = FALSE;
-
-	// Server disconnect
-	closesocket(_pSession->Socket);
-	
-
-	// Thread end
-	if (!bReconnect)
-	{
-		for (int i = 0; i < _iWorkerThreadMax; ++i)
-			PostQueuedCompletionStatus(_hIOCP, 0, 0, NULL); // 스레드 종료를 위한 IOCP 패킷을 생성하여 IOCP에 전송
-		WaitForMultipleObjects(_iWorkerThreadMax, _hWorkerThread, TRUE, INFINITE);
-		for (int i = 0; i < _iWorkerThreadMax; ++i)
-			CloseHandle(_hWorkerThread[i]);
-
-		// Winsock closse
-		WSACleanup();
-
-		// IOCP close
-		CloseHandle(_hIOCP);
-	}
 
 	// Session release
 	ReleaseSession();
@@ -131,6 +117,19 @@ void mylib::CLanClient::Stop(bool bReconnect)
 		delete _pSession;
 		_pSession = nullptr;
 	}
+
+	// Thread end
+	for (int i = 0; i < _iWorkerThreadMax; ++i)
+		PostQueuedCompletionStatus(_hIOCP, 0, 0, NULL); // 스레드 종료를 위한 IOCP 패킷을 생성하여 IOCP에 전송
+	WaitForMultipleObjects(_iWorkerThreadMax, _hWorkerThread, TRUE, INFINITE);
+	for (int i = 0; i < _iWorkerThreadMax; ++i)
+		CloseHandle(_hWorkerThread[i]);
+
+	// Winsock closse
+	WSACleanup();
+
+	// IOCP close
+	CloseHandle(_hIOCP);
 
 	_lRecvTps = 0;
 	_lSendTps = 0;
@@ -159,13 +158,72 @@ void mylib::CLanClient::PrintState(int iFlag)
 
 bool mylib::CLanClient::SendPacket(CNPacket * pPacket)
 {
+	if (!ReleaseSessionLock())
+		return false;
+
 	pPacket->AddRef();
 	WORD wHeader = pPacket->GetDataSize();
 	pPacket->SetHeader_Custom((char*)&wHeader, sizeof(wHeader));
 
 	_pSession->SendQ.Enqueue(pPacket);
 	SendPost();
+
+	ReleaseSessionFree();
 	return true;
+}
+
+bool mylib::CLanClient::SendPacket_Disconnect(CNPacket * pPacket)
+{
+	if (!ReleaseSessionLock())
+		return false;
+
+	pPacket->AddRef();
+	WORD wHeader = pPacket->GetDataSize();
+	pPacket->SetHeader_Custom((char*)&wHeader, sizeof(wHeader));
+
+	_pSession->SendQ.Enqueue(pPacket);
+	SendPost();
+	_pSession->bSendDisconnect = true;
+
+	ReleaseSessionFree();
+	return true;
+}
+
+bool mylib::CLanClient::ReleaseSessionLock()
+{
+	//  TODO : Multi-Thread 환경에서 Release, Connect, Send, Accept 등이 ContextSwitching으로 인해 동시 발생할 수 있음을 감안해야 함
+	/************************************************************/
+	/* 각종 세션 상태에서 다른 스레드가 Release를 시도했을 경우 */
+	/************************************************************/
+	// **CASE 0 : Release 플래그가 TRUE로 확실히 바뀐 상태
+	if (_pSession->stIO->bRelease == TRUE)
+		return nullptr;
+
+	// **CASE 1 : ReleaseSession 내에 있을 경우
+	// 이때 다른 스레드에서 SendPacket이나 Disconnect 시도 시, IOCnt가 1이 될 수 있음
+	if (InterlockedIncrement64(&_pSession->stIO->iCnt) == 1)
+	{
+		// 검증하면서 증가시킨 IOCnt를 다시 감소시켜 복구
+		if (InterlockedDecrement64(&_pSession->stIO->iCnt) == 0)
+			ReleaseSession(); // Release를 중첩으로 하는 문제는 Release 내에서 처리
+		return nullptr;
+	}
+
+	// **CASE 3 : Release 플래그가 FALSE임이 확실한 상태
+	if (_pSession->stIO->bRelease == FALSE)
+		return _pSession;
+
+	// **CASE 4 : CASE 3에 진입하기 직전에 TRUE로 바뀌었을 경우
+	if (InterlockedDecrement64(&_pSession->stIO->iCnt) == 0)
+		ReleaseSession();
+	return nullptr;
+}
+
+void mylib::CLanClient::ReleaseSessionFree()
+{
+	if (InterlockedDecrement64(&_pSession->stIO->iCnt) == 0)
+		ReleaseSession();
+	return;
 }
 
 bool mylib::CLanClient::ReleaseSession()
@@ -372,7 +430,7 @@ void mylib::CLanClient::RecvComplete(DWORD dwTransferred)
 		// RecvQ에서 Packet의 Payload 부분 제거
 		pPacket->MoveWritePos(wHeader);
 
-		++_lRecvTps;
+		InterlockedIncrement64(&_lRecvTps);
 
 		// 5. Packet 처리
 		OnRecv(pPacket);
@@ -395,9 +453,12 @@ void mylib::CLanClient::SendComplete(DWORD dwTransferred)
 		if (_pSession->SendQ.Dequeue(pPacket))
 		{
 			pPacket->Free();
-			++_lSendTps;
+			InterlockedIncrement64(&_lSendTps);
 		}
 	}
+
+	if (_pSession->bSendDisconnect == TRUE)
+		shutdown(_pSession->Socket, SD_BOTH);
 
 	InterlockedExchange(&_pSession->bSendFlag, FALSE);
 	SendPost();
@@ -500,6 +561,7 @@ mylib::CLanClient::stSESSION::stSESSION()
 	SendQ.Clear();
 	bSendFlag = FALSE;
 	iSendPacketCnt = 0;
+	bSendDisconnect = FALSE;
 }
 
 mylib::CLanClient::stSESSION::~stSESSION()

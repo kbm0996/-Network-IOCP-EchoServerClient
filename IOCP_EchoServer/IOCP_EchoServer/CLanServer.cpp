@@ -38,6 +38,7 @@ bool mylib::CLanServer::Start(WCHAR * szIP, int iPort, int iWorkerThreadCnt, boo
 	_hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
 	if (_hIOCP == NULL)
 	{
+		CloseHandle(_hIOCP);
 		LOG(L"SYSTEM", LOG_ERROR, L"CreateIoCompletionPort() failed %d", WSAGetLastError());
 		return false;
 	}
@@ -46,6 +47,7 @@ bool mylib::CLanServer::Start(WCHAR * szIP, int iPort, int iWorkerThreadCnt, boo
 	WSADATA wsa;
 	if (WSAStartup(WINSOCK_VERSION, &wsa) != 0)
 	{
+		CloseHandle(_hIOCP);
 		LOG(L"SYSTEM", LOG_ERROR, L"WSAStartup() failed %d", WSAGetLastError());
 		return false;
 	}
@@ -53,6 +55,8 @@ bool mylib::CLanServer::Start(WCHAR * szIP, int iPort, int iWorkerThreadCnt, boo
 	_ListenSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (_ListenSocket == INVALID_SOCKET)
 	{
+		CloseHandle(_hIOCP);
+		WSACleanup();
 		LOG(L"SYSTEM", LOG_ERROR, L"socket() failed %d", WSAGetLastError());
 		return false;
 	}
@@ -64,11 +68,17 @@ bool mylib::CLanServer::Start(WCHAR * szIP, int iPort, int iWorkerThreadCnt, boo
 	InetPton(AF_INET, szIP, reinterpret_cast<PVOID>(&serveraddr.sin_addr));
 	if (bind(_ListenSocket, reinterpret_cast<sockaddr*>(&serveraddr), sizeof(serveraddr)) == SOCKET_ERROR)
 	{
+		closesocket(_ListenSocket);
+		CloseHandle(_hIOCP);
+		WSACleanup();
 		LOG(L"SYSTEM", LOG_ERROR, L"bind() failed %d", WSAGetLastError());
 		return false;
 	}
 	if (listen(_ListenSocket, SOMAXCONN) == SOCKET_ERROR)
 	{
+		closesocket(_ListenSocket);
+		CloseHandle(_hIOCP);
+		WSACleanup();
 		LOG(L"SYSTEM", LOG_ERROR, L"listen() failed %d", WSAGetLastError());
 		return false;
 	}
@@ -102,7 +112,6 @@ void mylib::CLanServer::Stop()
 	// Thread end
 	WaitForSingleObject(_hAcceptThread, INFINITE);
 	CloseHandle(_hAcceptThread);
-
 	
 	for (int i = 0; i < _iWorkerThreadMax; ++i)	// WorkerThread 종료 메세지를 IOCP Queue에 임의 삽입
 		PostQueuedCompletionStatus(_hIOCP, 0, 0, 0);	
@@ -471,7 +480,7 @@ void mylib::CLanServer::RecvComplete(stSESSION * pSession, DWORD dwTransferred)
 		// RecvQ에서 Packet의 Payload 부분 제거
 		pPacket->MoveWritePos(wHeader);
 
-		++_lRecvTps;
+		InterlockedIncrement64(&_lRecvTps);
 		
 		// 5. Packet 처리
 		OnRecv(pSession->iSessionID, pPacket);
@@ -493,7 +502,7 @@ void mylib::CLanServer::SendComplete(stSESSION * pSession, DWORD dwTransferred)
 		if (pSession->SendQ.Dequeue(pPacket))
 		{
 			pPacket->Free();
-			++_lSendTps;
+			InterlockedIncrement64(&_lSendTps);
 		}
 	}
 

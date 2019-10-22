@@ -17,7 +17,7 @@ void main()
 	while (1)
 	{
 		system("cls");
-		//g_LanServer.PrintState(MON_CLIENT_ALL);
+		g_LanServer.PrintState(MON_CLIENT_ALL);
 		
 		g_LanServer.PrintChatline();
 

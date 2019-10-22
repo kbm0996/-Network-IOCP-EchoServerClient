@@ -49,21 +49,24 @@ namespace mylib
 		//
 		//////////////////////////////////////////////////////////////////////////
 		// Client ON/OFF
-		bool	Start(WCHAR* wszConnectIP, int iPort, int iWorkerThreadCnt, bool bNagle);
-		void	Stop(bool bReconnect = false);
+		bool Start(WCHAR* wszConnectIP, int iPort, int iWorkerThreadCnt, bool bNagle);
+		void Stop();
 
 		// Monitoring (Bit operation)
 		enum en_CLIENT_MONITOR
 		{
+			//en_CONNECT_CNT = 1,
+			//en_ACCEPT_CNT = 2,
 			en_PACKET_TPS = 4,
 			en_PACKETPOOL_SIZE = 8,
 			en_ALL = 15
 		};
-		void	PrintState(int iFlag = en_ALL);
+		void PrintState(int iFlag = en_ALL);
 
 	protected:
 		// External Call
-		bool	SendPacket(CNPacket * pPacket);
+		bool SendPacket(CNPacket *pPacket);
+		bool SendPacket_Disconnect(CNPacket *pPacket);
 
 		//////////////////////////////////////////////////////////////////////////
 		// Notice
@@ -116,9 +119,12 @@ namespace mylib
 
 			LONG		bSendFlag;
 			int			iSendPacketCnt;
+			bool		bSendDisconnect;
 		};
 
 		//  외부에서 호출하는 함수(SendPacket, Disconnect)에서 필요
+		bool	ReleaseSessionLock();
+		void	ReleaseSessionFree();
 		bool	ReleaseSession();
 
 		//////////////////////////////////////////////////////////////////////////

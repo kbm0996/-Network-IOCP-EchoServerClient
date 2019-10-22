@@ -20,13 +20,13 @@ void CEchoClient::InputChatline(WCHAR * szChat)
 	_Chatline.push_back(szInputChat);
 	ReleaseSRWLockExclusive(&_srwChatline);
 }
-
+#include <iostream>
 void CEchoClient::PrintChatline()
 {
 	int iNo = 0;
 	AcquireSRWLockShared(&_srwChatline);
 	for each(std::wstring sz in _Chatline)
-		wprintf(L"%02d # %s\n", ++iNo, sz);
+		wprintf(L"%02d # %s\n", ++iNo, sz.c_str());
 	ReleaseSRWLockShared(&_srwChatline);
 }
 
@@ -94,19 +94,19 @@ void CEchoClient::OnRecv(mylib::CNPacket * pPacket)
 		pPacket->GetData(reinterpret_cast<char*>(szMessage), wSize);
 
 
-			wprintf(L"%d %d %d %s\n", lPrecode, dwType, wSize, szMessage);
+		//wprintf(L"%d %d %d %s\n", lPrecode, dwType, wSize, szMessage);
 
-	*pPacket << lPrecode;
-	*pPacket << dwType;
-	*pPacket << wSize;
-	pPacket->PutData(reinterpret_cast<char*>(szMessage), wSize);
-	wprintf(L"%d %d %d %s\n", lPrecode, dwType, wSize, szMessage);
+		//*pPacket << lPrecode;
+		//*pPacket << dwType;
+		//*pPacket << wSize;
+		//pPacket->PutData(reinterpret_cast<char*>(szMessage), wSize);
+		//wprintf(L"%d %d %d %s\n", lPrecode, dwType, wSize, szMessage);
 
-	*pPacket >> lPrecode;
-	*pPacket >> dwType;
-	*pPacket >> wSize;
-	pPacket->GetData(reinterpret_cast<char*>(szMessage), wSize);
-	wprintf(L"%d %d %d %s\n", lPrecode, dwType, wSize, szMessage);
+		//*pPacket >> lPrecode;
+		//*pPacket >> dwType;
+		//*pPacket >> wSize;
+		//pPacket->GetData(reinterpret_cast<char*>(szMessage), wSize);
+		//wprintf(L"%d %d %d %s\n", lPrecode, dwType, wSize, szMessage);
 
 
 		InputChatline(szMessage);
