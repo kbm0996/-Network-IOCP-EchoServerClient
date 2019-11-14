@@ -36,6 +36,10 @@ void CEchoServer::OnRecv(UINT64 SessionID, mylib::CNPacket * pPacket)
 
 	pSendPacket->PutData(pPacket->GetPayloadPtr(), pPacket->GetDataSize());
 
+	//LONGLONG szData;
+	//memcpy(&szData, pPacket->GetPayloadPtr(), pPacket->GetDataSize());
+	//printf("%d\n", szData);
+
 	SendPacket(SessionID, pSendPacket);
 
 	pSendPacket->Free();

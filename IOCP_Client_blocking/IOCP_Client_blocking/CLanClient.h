@@ -75,8 +75,6 @@ namespace mylib
 		// OnClientLeave		: 서버 연결 끊긴 이후
 		// OnRecv				: 패킷 수신 후, 패킷 처리
 		// OnSend				: 패킷 송신 후
-		// OnWorkerThreadBegin	: WorkerThread GQCS 직후
-		// OnWorkerThreadEnd	: WorkerThread Loop 종료 후
 		// OnError				: 에러 발생 후
 		//////////////////////////////////////////////////////////////////////////
 		virtual void OnClientJoin() = 0;

@@ -38,8 +38,8 @@ bool mylib::CLanServer::Start(WCHAR * szIP, int iPort, int iWorkerThreadCnt, boo
 	_hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
 	if (_hIOCP == NULL)
 	{
-		CloseHandle(_hIOCP);
 		LOG(L"SYSTEM", LOG_ERROR, L"CreateIoCompletionPort() failed %d", WSAGetLastError());
+		CloseHandle(_hIOCP);
 		return false;
 	}
 
@@ -47,17 +47,17 @@ bool mylib::CLanServer::Start(WCHAR * szIP, int iPort, int iWorkerThreadCnt, boo
 	WSADATA wsa;
 	if (WSAStartup(WINSOCK_VERSION, &wsa) != 0)
 	{
-		CloseHandle(_hIOCP);
 		LOG(L"SYSTEM", LOG_ERROR, L"WSAStartup() failed %d", WSAGetLastError());
+		CloseHandle(_hIOCP);
 		return false;
 	}
 
 	_ListenSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (_ListenSocket == INVALID_SOCKET)
 	{
+		LOG(L"SYSTEM", LOG_ERROR, L"socket() failed %d", WSAGetLastError());
 		CloseHandle(_hIOCP);
 		WSACleanup();
-		LOG(L"SYSTEM", LOG_ERROR, L"socket() failed %d", WSAGetLastError());
 		return false;
 	}
 
@@ -68,18 +68,18 @@ bool mylib::CLanServer::Start(WCHAR * szIP, int iPort, int iWorkerThreadCnt, boo
 	InetPton(AF_INET, szIP, reinterpret_cast<PVOID>(&serveraddr.sin_addr));
 	if (bind(_ListenSocket, reinterpret_cast<sockaddr*>(&serveraddr), sizeof(serveraddr)) == SOCKET_ERROR)
 	{
+		LOG(L"SYSTEM", LOG_ERROR, L"bind() failed %d", WSAGetLastError());
 		closesocket(_ListenSocket);
 		CloseHandle(_hIOCP);
 		WSACleanup();
-		LOG(L"SYSTEM", LOG_ERROR, L"bind() failed %d", WSAGetLastError());
 		return false;
 	}
 	if (listen(_ListenSocket, SOMAXCONN) == SOCKET_ERROR)
 	{
+		LOG(L"SYSTEM", LOG_ERROR, L"listen() failed %d", WSAGetLastError());
 		closesocket(_ListenSocket);
 		CloseHandle(_hIOCP);
 		WSACleanup();
-		LOG(L"SYSTEM", LOG_ERROR, L"listen() failed %d", WSAGetLastError());
 		return false;
 	}
 
@@ -545,8 +545,7 @@ unsigned int mylib::CLanServer::AcceptThread_Process()
 			break;
 		if (SessionSocket == INVALID_SOCKET)
 		{
-			int err = WSAGetLastError();
-			LOG(L"SYSTEM", LOG_ERROR, L"WSAAccept() failed%d", err);
+			LOG(L"SYSTEM", LOG_ERROR, L"WSAAccept() failed%d", WSAGetLastError());
 			break;
 		}
 

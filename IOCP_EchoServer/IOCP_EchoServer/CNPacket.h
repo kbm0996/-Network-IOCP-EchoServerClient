@@ -57,7 +57,7 @@ namespace mylib
 	public:
 		enum en_NETWORK_PACKET
 		{
-			en_BUFFER_DEFAULT_SIZE = 500,		// 패킷의 기본 버퍼 크기.
+			en_BUFFER_DEFAULT_SIZE = 5000,		// 패킷의 기본 버퍼 크기.
 			en_HEADER_SIZE = 5
 		};
 

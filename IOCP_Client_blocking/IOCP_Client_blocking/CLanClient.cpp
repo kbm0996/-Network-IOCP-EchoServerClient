@@ -35,8 +35,8 @@ bool mylib::CLanClient::Start(WCHAR * wszConnectIP, int iPort, int iWorkerThread
 	WSADATA wsa;
 	if (WSAStartup(WINSOCK_VERSION, &wsa) != 0)
 	{
-		CloseHandle(_hIOCP);
 		LOG(L"SYSTEM", LOG_ERROR, L"WSAStartup() failed %d", WSAGetLastError());
+		CloseHandle(_hIOCP);
 		return false;
 	}
 
@@ -44,9 +44,9 @@ bool mylib::CLanClient::Start(WCHAR * wszConnectIP, int iPort, int iWorkerThread
 	_pSession->Socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (_pSession->Socket == INVALID_SOCKET)
 	{
+		LOG(L"SYSTEM", LOG_ERROR, L"socket() failed %d", WSAGetLastError());
 		CloseHandle(_hIOCP);
 		WSACleanup();
-		LOG(L"SYSTEM", LOG_ERROR, L"socket() failed %d", WSAGetLastError());
 		return false;
 	}
 
@@ -59,10 +59,10 @@ bool mylib::CLanClient::Start(WCHAR * wszConnectIP, int iPort, int iWorkerThread
 	InetPton(AF_INET, wszConnectIP, reinterpret_cast<PVOID>(&serveraddr.sin_addr));
 	if (connect(_pSession->Socket, reinterpret_cast<sockaddr*>(&serveraddr), sizeof(serveraddr)) == SOCKET_ERROR)
 	{
+		LOG(L"SYSTEM", LOG_ERROR, L"connect() failed %d", WSAGetLastError());
 		closesocket(_pSession->Socket);
 		CloseHandle(_hIOCP);
 		WSACleanup();
-		LOG(L"SYSTEM", LOG_ERROR, L"connect() failed %d", WSAGetLastError());
 		return false;
 	}
 
@@ -82,8 +82,7 @@ bool mylib::CLanClient::Start(WCHAR * wszConnectIP, int iPort, int iWorkerThread
 	{
 		//  HANDLE 인자에 소켓이 아닌 값이 올 경우 잘못된 핸들(6번 에러) 발생. 
 		// 소켓이 아닌 값을 넣었다는 것은 다른 스레드에서 소켓을 반환했다는 의미이므로  동기화 문제일 가능성이 높다.
-		int err = WSAGetLastError();
-		LOG(L"SYSTEM", LOG_ERROR, L"Session IOCP Enrollment ErrorCode:%d", err);
+		LOG(L"SYSTEM", LOG_ERROR, L"Session IOCP Enrollment ErrorCode:%d", WSAGetLastError());
 		if (InterlockedDecrement64(&_pSession->stIO->iCnt) == 0)
 			ReleaseSession();
 		return false;
