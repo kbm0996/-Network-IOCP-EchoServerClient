@@ -147,16 +147,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="APIHook.cpp" />
-    <ClCompile Include="CLanClient.cpp" />
+    <ClCompile Include="CLanDummy.cpp" />
     <ClCompile Include="CNPacket.cpp" />
     <ClCompile Include="CrashDump.cpp" />
     <ClCompile Include="CRingBuffer.cpp" />
-    <ClCompile Include="CEchoClient.cpp" />
+    <ClCompile Include="CEchoDummy.cpp" />
     <ClCompile Include="_main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="APIHook.h" />
-    <ClInclude Include="CLanClient.h" />
+    <ClInclude Include="CLanDummy.h" />
     <ClInclude Include="CLFMemoryPool.h" />
     <ClInclude Include="CLFMemoryPool_TLS.h" />
     <ClInclude Include="CLFQueue.h" />
@@ -165,7 +165,7 @@
     <ClInclude Include="CrashDump.h" />
     <ClInclude Include="CRingBuffer.h" />
     <ClInclude Include="CSystemLog.h" />
-    <ClInclude Include="CEchoClient.h" />
+    <ClInclude Include="CEchoDummy.h" />
     <ClInclude Include="_Define.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

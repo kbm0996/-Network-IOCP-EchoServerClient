@@ -1,18 +1,26 @@
 /*---------------------------------------------------------------
-  MemoryPool TLS
+MemoryPool TLS
 
- TLS(Thread Local Storage)를 활용해 하나의 메모리풀로부터 스레드별로 데이터 청크 할당
- 프로세스당 TLS 개수가 제한되어있으므로 이의 유의해야 함
+TLS(Thread Local Storage)를 활용해 하나의 메모리풀로부터 스레드별로 데이터 청크 할당
+프로세스당 TLS 개수가 제한되어있으므로 이의 유의해야 함
 
- - 클래스
- * CLFMemoryPool_TLS: CDataChunk를 관리하는 메모리풀을 내장한 클래스 
- * CDataChunk		: DATA Block 덩어리. 재활용X. 
 
- - 사용법
- CLFMemoryPool_TLS<DATA> MemPool(300, FALSE);
- DATA *pData = MemPool.Alloc();
- ~ pData 사용 ~
- MemPool.Free(pDATA);
+- 클래스
+
+* CLFMemoryPool_TLS: CDataChunk를 관리하는 메모리풀을 내장한 클래스
+* CDataChunk		: DATA Block 덩어리. 재활용X.
+
+
+- 사용법
+
+CLFMemoryPool_TLS<DATA> MemPool(300, FALSE);
+
+DATA *pData = MemPool.Alloc();
+
+~ pData 사용 ~
+
+MemPool.Free(pDATA);
+
 ----------------------------------------------------------------*/
 #ifndef  __MEMORY_POOL_TLS__
 #define  __MEMORY_POOL_TLS__
@@ -24,7 +32,7 @@
 
 namespace mylib
 {
-//#define DATA int
+	//#define DATA int
 	template<class DATA>
 	class CLFMemoryPool_TLS
 	{
@@ -81,7 +89,7 @@ namespace mylib
 		// Parameters: 없음.
 		// Return: (int) 메모리 풀 내부 전체 개수,
 		//////////////////////////////////////////////////////////////////////////
-		int	GetAllocSize() { return _pChunkPool->GetAllocSize(); } 
+		int	GetAllocSize() { return _pChunkPool->GetAllocSize(); }
 
 	private:
 		// TLS
@@ -89,7 +97,7 @@ namespace mylib
 		// CHUNK
 		CLFMemoryPool<CChunk>* _pChunkPool;
 		LONG	_lChunkSize;	// 청크 크기
-		// MONITOR
+								// MONITOR
 		LONG	_lUseCnt;		// 사용중인 블럭 수
 
 	private:
@@ -182,7 +190,7 @@ namespace mylib
 		{
 			pChunk->Clear(_lChunkSize);
 		}
-		
+
 		TlsSetValue(_dwTlsIndex, pChunk);
 
 		return pChunk;

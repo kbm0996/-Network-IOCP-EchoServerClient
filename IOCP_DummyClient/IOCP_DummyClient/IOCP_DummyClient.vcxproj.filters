@@ -30,13 +30,7 @@
     <ClCompile Include="_main.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="CEchoClient.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="APIHook.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="CLanClient.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="CNPacket.cpp">
@@ -46,6 +40,12 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="CRingBuffer.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CLanDummy.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CEchoDummy.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
@@ -80,10 +80,10 @@
     <ClInclude Include="_Define.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="CLanClient.h">
+    <ClInclude Include="CLanDummy.h">
       <Filter>헤더 파일\Library\CNetwork</Filter>
     </ClInclude>
-    <ClInclude Include="CEchoClient.h">
+    <ClInclude Include="CEchoDummy.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

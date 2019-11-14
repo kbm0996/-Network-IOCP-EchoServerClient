@@ -34,7 +34,6 @@
 #define df_SERVER_PORT		6000
 #define df_PACKET_SIZE_MAX	1024
 
-#define df_PACKET_PRECODE	0x7fffffffffffffff
-#define df_PACKET_TYPE_CHAT	10
+#define df_PACKET_PRECODE	0x6fffffffffffffff
 
 #endif // !__DEFINE_H__

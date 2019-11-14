@@ -1,81 +1,144 @@
-#include "CEchoClient.h"
+#include "CEchoDummy.h"
 #include <conio.h>
 #include <iostream>
-
 bool g_bMonitor;
 
-CEchoClient g_LanServer;
+CEchoDummy g_Dummy;
 
 bool ServerControl();
 
 void main()
 {
+	WCHAR szServerip[16] = { 0, };
+	int bDisconnect;
+	int iClientCnt;
+	int iThreadCnt;
+	int iOversendCnt;
+	int iDisconnectDelay;
+	int iLoopDelay;
+
 	_wsetlocale(LC_ALL, L"");
 	LOG_SET(LOG_CONSOLE | LOG_FILE, LOG_DEBUG);
-	if(!g_LanServer.Start(df_SERVER_IP, df_SERVER_PORT, 2, true))
+
+	//wprintf(L"Server IP : ");
+	//std::wcin.getline(szServerip, sizeof(szServerip));
+
+	wprintf(L"Disconnect Test		1 = Yes / 2 = No : ");
+	scanf_s("%d", &bDisconnect);
+	switch (bDisconnect)
+	{
+	case 1:
+		bDisconnect = TRUE;
+		break;
+	default:
+	case 2:
+		bDisconnect = FALSE;
+		break;
+	}
+
+	wprintf(L"Client Count		1 = 1 / 2 = 2 / 3 = 50 / 4 = 100 [Best 50] : ");
+	scanf_s("%d", &iClientCnt);
+	switch (iClientCnt)
+	{
+	case 1:
+		iClientCnt = 1;
+		break;
+	case 2:
+		iClientCnt = 2;
+		break;
+	default:
+	case 3:
+		iClientCnt = 50;
+		break;
+	case 4:
+		iClientCnt = 100;
+		break;
+	}
+
+	wprintf(L"OverSend Count		1 = 1 / 2 = 100 / 3 = 200 [Best 100] : ");
+	scanf_s("%d", &iOversendCnt);
+	switch (iOversendCnt)
+	{
+	default:
+	case 1:
+		iOversendCnt = 1;
+		break;
+	case 2:
+		iOversendCnt = 100;
+		break;
+	case 3:
+		iOversendCnt = 200;
+		break;
+	}
+
+	if (bDisconnect)
+	{
+		wprintf(L"Disconnect Delay	1 = 0 sec / 2 = 2 sec / 3 = 3 sec : ");
+		scanf_s("%d", &iDisconnectDelay);
+		switch (iDisconnectDelay)
+		{
+		default:
+		case 1:
+			iDisconnectDelay = 0;
+			break;
+		case 2:
+			iDisconnectDelay = 2000;
+			break;
+		case 3:
+			iDisconnectDelay = 3000;
+			break;
+		}
+	}
+	if (bDisconnect && iClientCnt >= 50)
+		iThreadCnt = iClientCnt / 2;
+	else if (!bDisconnect && iClientCnt >= 50)
+		iThreadCnt = iClientCnt / 50;
+	else
+		iThreadCnt = 1;
+
+	wprintf(L"Loop Delay ms [Best 0] : ");
+	scanf_s("%d", &iLoopDelay);
+
+	if(!g_Dummy.Start(df_SERVER_IP, df_SERVER_PORT, true, iClientCnt, iThreadCnt, bDisconnect, iOversendCnt, iDisconnectDelay, iLoopDelay))
 		return;
 
 	while (1)
-	{
-		system("cls");
-		
-		if(g_bMonitor)
-			g_LanServer.PrintState(MON_CLIENT_ALL);
-		
-		g_LanServer.PrintChatline();
-
+	{	
 		if (!ServerControl())
 			break;
+
+		g_Dummy.PrintState();
+
+		Sleep(1000);
 	}
 
-	g_LanServer.Stop();
+	g_Dummy.Stop();
 }
 
 bool ServerControl()
 {
-	static bool bControlMode = false;
-
-	//------------------------------------------
-	// L : Control Lock / U : Unlock / Q : Quit
-	//------------------------------------------
-	//  _kbhit() 함수 자체가 느리기 때문에 사용자 혹은 더미가 많아지면 느려져서 실제 테스트시 주석처리 권장
-	// 그런데도 GetAsyncKeyState를 안 쓴 이유는 창이 활성화되지 않아도 키를 인식함
-	//  WinAPI라면 제어가 가능하나 콘솔에선 어려움
+	if (!g_Dummy._bSendEcho)
+		wprintf(L" S : Echo PLAY | Q : Quit\n");
+	else
+		wprintf(L" S : Echo STOP | Q : Quit\n");
+	if (!g_Dummy._bDisconnect)
+		wprintf(L" C : Reconnect PLAY\n");
+	else
+		wprintf(L" C : Reconnect STOP\n");
 
 	if (_kbhit())
 	{
 		WCHAR ControlKey = _getwch();
 
-		if (L'u' == ControlKey || L'U' == ControlKey)
-		{
-			bControlMode = true;
+		if (L's' == ControlKey || L'S' == ControlKey)
+			g_Dummy._bSendEcho = !g_Dummy._bSendEcho;
 
-			wprintf(L"[ Control Mode ] \n");
-			wprintf(L"Press  L	- Key Lock \n");
-			wprintf(L"Press  M	- Monitoring \n");
-			wprintf(L"Press  Q	- Quit \n");
-			
-		}
+		if (L'c' == ControlKey || L'C' == ControlKey)
+			g_Dummy._bDisconnect = !g_Dummy._bDisconnect;
 
-		if (bControlMode == true)
-		{
-			if (L'l' == ControlKey || L'L' == ControlKey)
-			{
-				wprintf(L"Controll Lock. Press U - Control Unlock \n");
-				bControlMode = false;
-			}
+		if (L'q' == ControlKey || L'Q' == ControlKey)
+			return false;
 
-			if (L'm' == ControlKey || L'M' == ControlKey)
-			{
-				wprintf(L"Controll Lock. Press U - Control Unlock \n");
-				bControlMode = false;
-			}
-
-			if (L'q' == ControlKey || L'Q' == ControlKey)
-			{
-				return false;
-			}
-		}
 	}
 
 	return true;
