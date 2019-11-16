@@ -25,6 +25,7 @@ void main()
 
 	wprintf(L"Disconnect Test		1 = Yes / 2 = No : ");
 	scanf_s("%d", &bDisconnect);
+	///bDisconnect = 2;
 	switch (bDisconnect)
 	{
 	case 1:

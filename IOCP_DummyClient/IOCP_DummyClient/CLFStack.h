@@ -6,11 +6,11 @@
  특정 데이터(구조체,클래스,변수)를 일정량 할당 후 나눠쓴다.
 
 - 사용법
-CLFStack<UINT64>	_SessionStk;
+CLFStack<UINT64>	_stkSession;
 UINT iCnt = 0;
-_SessionStk.Push(iCnt);
+_stkSession.Push(iCnt);
 UINT64 iIndex;
-_SessionStk.Pop(iIndex);
+_stkSession.Pop(iIndex);
 
 - 최적화 컴파일 대비
   개발 환경에 따라서 최적화 컴파일을 할 수도 있음.

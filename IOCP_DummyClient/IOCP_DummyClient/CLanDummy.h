@@ -35,7 +35,7 @@ void main()
 #include "CRingBuffer.h"
 #include "CLFQueue.h"
 #include "CLFStack.h"
-#include <list>
+#include <vector>
 // sizeof(UINT64) == 8 Byte == 64 Bit
 // [00000000 00000000 0000] [0000 00000000 00000000 00000000 00000000 00000000]
 // 1. 상위 2.5 Byte = Index 영역
@@ -63,12 +63,13 @@ namespace mylib
 		
 	protected:
 		struct stSESSION;
+		stSESSION * ConnectSession(int nIndex);
+		void DisconnectSession(SOCKET socket);
+
 		// External Call
-		bool ConnectSession(int nIndex);
 		bool SendPacket(UINT64 iSessionID, CNPacket * pPacket);
 		bool SendPacket_Disconnect(UINT64 iSessionID, CNPacket * pPacket);
 
-		
 		//////////////////////////////////////////////////////////////////////////
 		// Notice
 		//
@@ -133,7 +134,7 @@ namespace mylib
 			CLFQueue<ULONGLONG> stkEcho;
 			ULONGLONG	lLastRecvTick; 
 			ULONGLONG	lLastLoginTick;
-			LONG		lStatus;
+			enSTAT		lStatus;
 		};
 
 		//  외부에서 호출하는 함수(SendPacket, Disconnect)에서 필요
@@ -156,7 +157,7 @@ namespace mylib
 		static unsigned int CALLBACK UpdateThread(LPVOID pCLanDummy);
 		static unsigned int CALLBACK WorkerThread(LPVOID pCLanDummy);
 		unsigned int MonitorThread_Process();
-		unsigned int UpdateThread_Process(std::list<stSESSION*> * Sessionlist);
+		unsigned int UpdateThread_Process(int iSessionMax);
 		unsigned int WorkerThread_Process();
 
 		//////////////////////////////////////////////////////////////////////////
@@ -167,6 +168,7 @@ namespace mylib
 		// Server
 		WCHAR				_szServerIP[16];
 		int					_iPort;
+		SOCKADDR_IN			_serveraddr;
 		BOOL				_bServerOn;
 		BOOL				_bNagle;
 		HANDLE				_hIOCP;
@@ -175,7 +177,7 @@ namespace mylib
 		struct stTHREAD_INFO
 		{
 			CLanDummy * pThisClass;
-			std::list<stSESSION*> Sessionlist;
+			int iSessionMax;
 		};
 		stTHREAD_INFO *		_arrThreadInfo;
 		int					_iWorkerThreadMax;
@@ -185,8 +187,10 @@ namespace mylib
 		HANDLE*				_hUpdateThread;
 		LONG64 _nData;
 		// Session
-		stSESSION*			_SessionArr;
+		stSESSION*			_arrSession;
 		UINT64				_iSessionID;
+		CLFStack<int>		_stkSession;	// 빈 세션 저장용 Freelist
+
 		LONG64				_lConnectMax;
 
 	public:

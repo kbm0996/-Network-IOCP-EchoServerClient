@@ -56,7 +56,7 @@ void CEchoDummy::PrintState()
 
 void CEchoDummy::OnClientJoin(UINT64 iSessionID)
 {
-	//stSESSION * pSession = &_SessionArr[GetSessionIndex(iSessionID)];
+	//stSESSION * pSession = &_arrSession[GetSessionIndex(iSessionID)];
 	//pSession->stkEcho.Clear();
 	//pSession->lLastRecvTick = GetTickCount64();
 	//pSession->lLastLoginTick = GetTickCount64();
@@ -84,7 +84,7 @@ void CEchoDummy::OnRecv(UINT64 iSessionID, mylib::CNPacket * pPacket)
 	*pPacket >> nData;
 
 	ULONGLONG lCurRecvTick = GetTickCount64();
-	stSESSION * pSession = &_SessionArr[GetSessionIndex(iSessionID)];
+	stSESSION * pSession = &_arrSession[GetSessionIndex(iSessionID)];
 
 	ULONGLONG nData_out;
 	pSession->stkEcho.Dequeue(nData_out);

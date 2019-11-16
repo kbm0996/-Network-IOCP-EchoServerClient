@@ -56,13 +56,17 @@ bool mylib::CLanDummy::Start(WCHAR * wszConnectIP, int iPort, bool bNagle, __int
 		return false;
 	}
 
+	_serveraddr.sin_family = AF_INET;
+	_serveraddr.sin_port = htons(_iPort);
+	InetPton(AF_INET, _szServerIP, reinterpret_cast<PVOID>(&_serveraddr.sin_addr));
+
 	// Session Init
-	_SessionArr = new stSESSION[iConnectMax];
-	for (int i = 0; i < iConnectMax; ++i)
+	_arrSession = new stSESSION[iConnectMax];
+	for (int i = iConnectMax - 1; i >= 0; --i)
 	{
-		_SessionArr[i].nIndex = i;
-		_SessionArr[i].iSessionID = CreateSessionID(++_iSessionID, i);
-		///_SessionStk.Push(i);
+		_arrSession[i].nIndex = i;
+		///_arrSession[i].iSessionID = CreateSessionID(++_iSessionID, i);
+		_stkSession.Push(i);
 	}
 
 	// Thread start
@@ -74,13 +78,12 @@ bool mylib::CLanDummy::Start(WCHAR * wszConnectIP, int iPort, bool bNagle, __int
 
 	_arrThreadInfo = new stTHREAD_INFO[_iUpdateThreadMax];
 	for (int i = 0; i < _iUpdateThreadMax; ++i)
-		_arrThreadInfo[i].pThisClass = this;
-
-	for (int i = 0; i < _lConnectMax; ++i)
 	{
-		stSESSION * pSession = &_SessionArr[i];
-		_arrThreadInfo[i%_iUpdateThreadMax].Sessionlist.push_front(pSession);
+		_arrThreadInfo[i].pThisClass = this;
+		_arrThreadInfo[i].iSessionMax = 0;
 	}
+	for (int i = 0; i < _lConnectMax; ++i)
+		++_arrThreadInfo[i%_iUpdateThreadMax].iSessionMax;
 
 	_hUpdateThread = new HANDLE[_iUpdateThreadMax];
 	for (int i = 0; i < _iUpdateThreadMax; ++i)
@@ -117,12 +120,12 @@ void mylib::CLanDummy::Stop()
 	// Session Release
 	for (int i = 0; i < _lConnectMax; ++i)
 	{
-		if (_SessionArr[i].Socket != INVALID_SOCKET)
-			ReleaseSession(&_SessionArr[i]);
+		if (_arrSession[i].Socket != INVALID_SOCKET)
+			ReleaseSession(&_arrSession[i]);
 	}
 
-	if (_SessionArr != nullptr)
-		delete[] _SessionArr;
+	if (_arrSession != nullptr)
+		delete[] _arrSession;
 	
 	if (_hWorkerThread != nullptr)
 		delete[] _hWorkerThread;
@@ -133,33 +136,50 @@ void mylib::CLanDummy::Stop()
 	LOG(L"SYSTEM", LOG_DEBUG, L"Client Stop");
 }
 
-bool mylib::CLanDummy::ConnectSession(int nIndex)
+mylib::CLanDummy::stSESSION * mylib::CLanDummy::ConnectSession(int nIndex)
 {
-	stSESSION * pSession = &_SessionArr[nIndex];
+	stSESSION * pSession = &_arrSession[nIndex];
+	pSession->lStatus = stSESSION::enSTAT::en_CONNECT;
+
+	InterlockedIncrement64(&_lConnectTryTps);
+
 	pSession->Socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (pSession->Socket == INVALID_SOCKET)
 	{
 		LOG(L"SYSTEM", LOG_ERROR, L"socket() failed %d", WSAGetLastError());
 		return false;
 	}
-
-
+	
+	linger optval;
+	optval.l_onoff = 1;
+	optval.l_linger = 0;
+	setsockopt(pSession->Socket, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
 	setsockopt(pSession->Socket, IPPROTO_TCP, TCP_NODELAY, (char *)&_bNagle, sizeof(_bNagle));
 
 	// Server connect
-	SOCKADDR_IN serveraddr;
-	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_port = htons(_iPort);
-	InetPton(AF_INET, _szServerIP, reinterpret_cast<PVOID>(&serveraddr.sin_addr));
-	if (connect(pSession->Socket, reinterpret_cast<sockaddr*>(&serveraddr), sizeof(serveraddr)) == SOCKET_ERROR)
+	if (connect(pSession->Socket, reinterpret_cast<sockaddr*>(&_serveraddr), sizeof(_serveraddr)) == SOCKET_ERROR)
 	{
-		LOG(L"SYSTEM", LOG_ERROR, L"connect() failed %d", WSAGetLastError());
-		closesocket(pSession->Socket);
-		return false;
+		int err = WSAGetLastError();
+		// WSAENOTSOCK(10038) : 소켓이 아닌 항목에 소켓 작업 시도
+		// WSAECONNABORTED(10053) : 호스트가 연결 중지. 데이터 전송 시간 초과, 프로토콜 오류 발생
+		// WSAECONNRESET(10054) : 원격 호스트에 의해 기존 연결 강제 해제. 원격 호스트가 갑자기 중지되거나 다시 시작되거나 하드 종료를 사용하는 경우
+		// WSAESHUTDOWN(10058) : 소켓 종료 후 전송
+		// WSAECONNREFUSED(10061) : 서버 연결 거부
+		if (err != 10038 && err != 10053 && err != 10054 && err != 10058 && err != 10061)
+		{
+			// WSAEINVAL(10022) : 바인딩 실패. 이미 bind된 소켓에 바인드하거나 주소체계가 일관적이지 않을 때
+			// WSAEISCONN(10056) : 이미 연결이 완료된 소켓임. connect로 연결이 완료된 소켓에 다시 connect를 시도할 경우
+			LOG(L"SYSTEM", LOG_ERROR, L"connect() failed %d", err);
+		}
+
+		return nullptr;
 	}
+
+	InterlockedIncrement64(&_lConnectCnt);
 
 	InterlockedIncrement64(&pSession->stIO->iCnt);
 
+	pSession->iSessionID = CreateSessionID(++_iSessionID, nIndex);
 	pSession->RecvQ.Clear();
 	pSession->SendQ.Clear();
 	pSession->bSendFlag = FALSE;
@@ -176,7 +196,7 @@ bool mylib::CLanDummy::ConnectSession(int nIndex)
 		LOG(L"SYSTEM", LOG_ERROR, L"Session IOCP Enrollment failed %d", WSAGetLastError());
 		if (InterlockedDecrement64(&pSession->stIO->iCnt) == 0)
 			ReleaseSession(pSession);
-		return false;
+		return nullptr;
 	}
 
 	pSession->stIO->bRelease = FALSE;
@@ -190,11 +210,16 @@ bool mylib::CLanDummy::ConnectSession(int nIndex)
 	if (InterlockedDecrement64(&pSession->stIO->iCnt) == 0)
 	{
 		ReleaseSession(pSession);
-		return false;
+		return nullptr;
 	}
 
-	InterlockedExchange(&pSession->lStatus, stSESSION::enSTAT::en_SEND);
-	return true;
+	return pSession;
+}
+
+void mylib::CLanDummy::DisconnectSession(SOCKET socket)
+{
+	//shutdown(socket, SD_BOTH);
+	closesocket(socket);
 }
 
 bool mylib::CLanDummy::SendPacket(UINT64 iSessionID, CNPacket * pPacket)
@@ -235,9 +260,9 @@ bool mylib::CLanDummy::SendPacket_Disconnect(UINT64 iSessionID, CNPacket * pPack
 
 mylib::CLanDummy::stSESSION * mylib::CLanDummy::ReleaseSessionLock(UINT64 iSessionID)
 {
+	int iIndex = GetSessionIndex(iSessionID);
 	//  TODO : Multi-Thread 환경에서 Release, Connect, Send, Accept 등이 ContextSwitching으로 인해 동시 발생할 수 있음을 감안해야 함
-	int nIndex = GetSessionIndex(iSessionID);
-	stSESSION *pSession = &_SessionArr[nIndex];
+	stSESSION *pSession = &_arrSession[iIndex];
 
 	/************************************************************/
 	/* 각종 세션 상태에서 다른 스레드가 Release를 시도했을 경우 */
@@ -287,19 +312,20 @@ bool mylib::CLanDummy::ReleaseSession(stSESSION * pSession)
 	if (!InterlockedCompareExchange128((LONG64*)pSession->stIO, TRUE, 0, (LONG64*)&stComparentIO))
 		return false;
 
+	pSession->lStatus = stSESSION::enSTAT::en_RELEASE;
+
 	// TODO : shutdown()
 	//  shutdown() 함수는 4HandShake(1Fin - 2Ack+3Fin - 4Fin)에서 1Fin을 보내는 함수
 	// 1. 상대편에서 이에 대한 Ack를 보내지 않으면(대게 상대방이 '응답없음'으로 먹통됐을 경우) 종료가 되지 않음
 	//   - 이 현상(연결 끊어야하는데 안끊어지는 경우)이 지속되면 메모리가 순간적으로 증가하고 SendBuffer가 터질 수 있음
 	// 2. TimeWait이 남음
 	//   - CancelIoEx 사용하여 4HandShake를 무시하고 닫아야 남지 않는다
-	shutdown(pSession->Socket, SD_BOTH);
+	DisconnectSession(pSession->Socket);
 
 	// TODO : CancelIoEx()
 	//  shutdown으로는 닫을 수 없을 경우 사용 (SendBuffer가 가득 찼을때, Heartbeat가 끊어졌을때)
 	// CancelIoEx()과 WSARecv() 간에 경합이 발생한다. 경합이 발생하더라도 shutdown()이 WSARecv()를 실패하도록 유도한다.
 	CancelIoEx(reinterpret_cast<HANDLE>(pSession->Socket), NULL);
-	closesocket(pSession->Socket);
 
 	OnClientLeave(pSession->iSessionID);
 
@@ -312,11 +338,11 @@ bool mylib::CLanDummy::ReleaseSession(stSESSION * pSession)
 	}
 
 	InterlockedExchange(&pSession->bSendFlag, FALSE);
+	pSession->iSessionID = -1;
 	pSession->Socket = INVALID_SOCKET;
 	pSession->stkEcho.Clear();
+	_stkSession.Push(pSession->nIndex);
 	InterlockedDecrement64(&_lConnectCnt);
-
-	InterlockedExchange(&pSession->lStatus, stSESSION::enSTAT::en_CONNECT);
 
 	return true;
 }
@@ -349,9 +375,11 @@ bool mylib::CLanDummy::RecvPost(stSESSION * pSession)
 			// WSAECONNRESET(10054) : 원격 호스트에 의해 기존 연결 강제 해제. 원격 호스트가 갑자기 중지되거나 다시 시작되거나 하드 종료를 사용하는 경우
 			// WSAESHUTDOWN(10058) : 소켓 종료 후 전송
 			if (err != 10038 && err != 10053 && err != 10054 && err != 10058)
-				LOG(L"SYSTEM", LOG_ERROR, L"WSARecv() failed%d / Socket:%d / RecvQ Size:%d", err, pSession->Socket, pSession->RecvQ.GetUseSize());
-
-			shutdown(pSession->Socket, SD_BOTH);
+			{
+				// WSAEINTR(10004) : 블록화 호출 취소. 데이터 수신이나 송신상에서 버퍼초과나 일정시간동안  기다렸는데도 수신을 할수 없는 경우
+				LOG(L"SYSTEM", LOG_ERROR, L"WSARecv() failed %d / Socket:%d / RecvQ Size:%d", err, pSession->Socket, pSession->RecvQ.GetUseSize());
+			}
+			DisconnectSession(pSession->Socket);
 			if (InterlockedDecrement64(&pSession->stIO->iCnt) == 0)
 				ReleaseSession(pSession);
 			return false;
@@ -429,10 +457,10 @@ bool mylib::CLanDummy::SendPost(stSESSION * pSession)
 			// WSAECONNRESET(10054) : 원격 호스트에 의해 기존 연결 강제 해제. 원격 호스트가 갑자기 중지되거나 다시 시작되거나 하드 종료를 사용하는 경우
 			// WSAESHUTDOWN(10058) : 소켓 종료 후 전송
 			if (err != 10038 && err != 10053 && err != 10054 && err != 10058)
-				LOG(L"SYSTEM", LOG_ERROR, L"WSASend() # failed%d / Socket:%d / IOCnt:%d / SendQ Size:%d", err, pSession->Socket, pSession->stIO->iCnt, pSession->SendQ.GetUseSize());
+				LOG(L"SYSTEM", LOG_ERROR, L"WSASend() # failed %d / Socket:%d / IOCnt:%d / SendQ Size:%d", err, pSession->Socket, pSession->stIO->iCnt, pSession->SendQ.GetUseSize());
 
-			//InterlockedExchange(&pSession->bSendFlag, FALSE);
-			shutdown(pSession->Socket, SD_BOTH);
+			InterlockedExchange(&pSession->bSendFlag, FALSE);
+			DisconnectSession(pSession->Socket);
 			if (InterlockedDecrement64(&pSession->stIO->iCnt) == 0)
 				ReleaseSession(pSession);
 
@@ -465,7 +493,7 @@ void mylib::CLanDummy::RecvComplete(stSESSION * pSession, DWORD dwTransferred)
 		if (iRecvSize < sizeof(wHeader) + wHeader)
 		{
 			// Header의 Payload의 길이가 실제와 다름
-			shutdown(pSession->Socket, SD_BOTH);
+			DisconnectSession(pSession->Socket);
 			LOG(L"SYSTEM", LOG_WARNG, L"Header & PayloadLength mismatch");
 			break;
 		}
@@ -478,7 +506,7 @@ void mylib::CLanDummy::RecvComplete(stSESSION * pSession, DWORD dwTransferred)
 		if (pPacket->GetBufferSize() < wHeader)
 		{
 			pPacket->Free();
-			shutdown(pSession->Socket, SD_BOTH);
+			DisconnectSession(pSession->Socket);
 			LOG(L"SYSTEM", LOG_WARNG, L"PacketBufferSize < PayloadSize ");
 			break;
 		}
@@ -488,7 +516,7 @@ void mylib::CLanDummy::RecvComplete(stSESSION * pSession, DWORD dwTransferred)
 		{
 			pPacket->Free();
 			LOG(L"SYSTEM", LOG_WARNG, L"RecvQ dequeue error");
-			shutdown(pSession->Socket, SD_BOTH);
+			DisconnectSession(pSession->Socket);
 			break;
 		}
 
@@ -504,8 +532,6 @@ void mylib::CLanDummy::RecvComplete(stSESSION * pSession, DWORD dwTransferred)
 
 	// SessionSocket을 recv 상태로 변경
 	RecvPost(pSession);
-
-
 }
 
 void mylib::CLanDummy::SendComplete(stSESSION * pSession, DWORD dwTransferred)
@@ -525,7 +551,7 @@ void mylib::CLanDummy::SendComplete(stSESSION * pSession, DWORD dwTransferred)
 	}
 
 	if (pSession->bSendDisconnect == TRUE)
-		shutdown(pSession->Socket, SD_BOTH);
+		DisconnectSession(pSession->Socket);
 
 	InterlockedExchange(&pSession->bSendFlag, FALSE);
 	SendPost(pSession);
@@ -539,8 +565,7 @@ unsigned int mylib::CLanDummy::MonitorThread(LPVOID pCLanDummy)
 unsigned int mylib::CLanDummy::UpdateThread(LPVOID pThreadInfo)
 {
 	CLanDummy * pCLanDummy = ((stTHREAD_INFO *)pThreadInfo)->pThisClass;
-	std::list<stSESSION*> * Sessionlist = &((stTHREAD_INFO *)pThreadInfo)->Sessionlist;
-	return pCLanDummy->UpdateThread_Process(Sessionlist);
+	return pCLanDummy->UpdateThread_Process(((stTHREAD_INFO *)pThreadInfo)->iSessionMax);
 }
 
 
@@ -554,43 +579,70 @@ unsigned int mylib::CLanDummy::MonitorThread_Process()
 	return 0;
 }
 
-unsigned int mylib::CLanDummy::UpdateThread_Process(std::list<stSESSION*> * Sessionlist)
+unsigned int mylib::CLanDummy::UpdateThread_Process(int iSessionMax)
 {
+	std::vector<stSESSION*> vtSession;
+	vtSession.clear();
+
 	while (_bServerOn)
 	{
-		for (auto iter = Sessionlist->begin(); iter != Sessionlist->end(); ++iter)
+		// Connect
+		if (vtSession.size() < iSessionMax)
 		{
-			stSESSION * pSession = *iter;
-			if (pSession->lStatus == stSESSION::enSTAT::en_CONNECT)
+			int nIndex = -1;
+			stSESSION * pSession;
+			if (_stkSession.Pop(nIndex))
 			{
-				InterlockedIncrement64(&_lConnectTryTps);
-				if (!ConnectSession(pSession->nIndex))
+				pSession = ConnectSession(nIndex);
+				if (pSession != nullptr)
 				{
-					InterlockedIncrement64(&_lConnectFailCnt);
+					InterlockedIncrement64(&_lConnectSuccessTps);
+					vtSession.push_back(pSession);
+					pSession->lStatus = stSESSION::enSTAT::en_SEND;
 				}
 				else
 				{
-					InterlockedIncrement64(&_lConnectSuccessTps);
-					InterlockedIncrement64(&_lConnectCnt);
+					InterlockedIncrement64(&_lConnectFailCnt);
+					_stkSession.Push(nIndex);
 				}
 			}
+		}
 
-			if (pSession->stkEcho.GetUseSize() == 0)
+		// Send
+		if (_bSendEcho)
+		{
+			for (auto iter = vtSession.begin(); iter != vtSession.end(); /*++iter*/)
 			{
-				if (pSession->lStatus == stSESSION::enSTAT::en_SEND)
+				stSESSION * pSession = *iter;
+				if (!pSession->stkEcho.GetUseSize())
 				{
-					if (_bSendEcho)
+					if (pSession->lStatus == stSESSION::enSTAT::en_SEND)
+					{
 						OnEcho(pSession);
-					if (_bDisconnect)
-						InterlockedExchange(&pSession->lStatus, stSESSION::enSTAT::en_DISCONNECT);
+						//if (_bDisconnect && GetTickCount64() - pSession->lLastLoginTick >= _iDisconnectDelay)
+						//	pSession->lStatus = stSESSION::enSTAT::en_DISCONNECT;
+					}
 				}
-				else if (pSession->lStatus == stSESSION::enSTAT::en_DISCONNECT
-					&& GetTickCount64() - pSession->lLastLoginTick >= _iDisconnectDelay
-					&& _bDisconnect)
+				++iter;
+			}
+		}
+		
+		// Disconnect
+		if (_bDisconnect)
+		{
+			for (auto iter = vtSession.begin(); iter != vtSession.end();)
+			{
+				stSESSION * pSession = *iter;
+				if (!pSession->stkEcho.GetUseSize())
 				{
-					shutdown(pSession->Socket, SD_BOTH);
-					///InterlockedExchange(&pSession->lStatus, stSESSION::enSTAT::en_RELEASE);
+					if (pSession->lStatus == stSESSION::enSTAT::en_DISCONNECT)
+					{
+						DisconnectSession(pSession->Socket);
+						iter = vtSession.erase(iter);
+						continue;
+					}
 				}
+				++iter;
 			}
 		}
 
@@ -652,7 +704,7 @@ unsigned int mylib::CLanDummy::WorkerThread_Process()
 		// (3)(4) 세션 종료
 		if (dwTransferred == 0)
 		{
-			shutdown(pSession->Socket, SD_BOTH);
+			DisconnectSession(pSession->Socket);
 		}
 		// (1)
 		else

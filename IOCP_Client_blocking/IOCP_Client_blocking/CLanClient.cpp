@@ -250,6 +250,7 @@ bool mylib::CLanClient::ReleaseSession()
 		pPacket = nullptr;
 	}
 
+	InterlockedExchange(&_pSession->bSendFlag, FALSE);
 	_pSession->iSessionID = -1;
 	_pSession->Socket = INVALID_SOCKET;
 	return true;
