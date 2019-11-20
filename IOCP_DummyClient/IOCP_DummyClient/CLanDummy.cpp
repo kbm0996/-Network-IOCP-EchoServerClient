@@ -63,11 +63,7 @@ bool mylib::CLanDummy::Start(WCHAR * wszConnectIP, int iPort, bool bNagle, __int
 	// Session Init
 	_arrSession = new stSESSION[iConnectMax];
 	for (int i = iConnectMax - 1; i >= 0; --i)
-	{
 		_arrSession[i].nIndex = i;
-		///_arrSession[i].iSessionID = CreateSessionID(++_iSessionID, i);
-		_stkSession.Push(i);
-	}
 
 	// Thread start
 	_hWorkerThread = new HANDLE[_iWorkerThreadMax];
@@ -80,10 +76,13 @@ bool mylib::CLanDummy::Start(WCHAR * wszConnectIP, int iPort, bool bNagle, __int
 	for (int i = 0; i < _iUpdateThreadMax; ++i)
 	{
 		_arrThreadInfo[i].pThisClass = this;
-		_arrThreadInfo[i].iSessionMax = 0;
+		InitializeSRWLock(&_arrThreadInfo[i].srwSessionLock);
 	}
 	for (int i = 0; i < _lConnectMax; ++i)
-		++_arrThreadInfo[i%_iUpdateThreadMax].iSessionMax;
+	{
+		_arrSession[i].pThreadInfo = &_arrThreadInfo[i%_iUpdateThreadMax];
+		_arrThreadInfo[i%_iUpdateThreadMax].vtSession.push_back(&_arrSession[i]);
+	}
 
 	_hUpdateThread = new HANDLE[_iUpdateThreadMax];
 	for (int i = 0; i < _iUpdateThreadMax; ++i)
@@ -136,17 +135,16 @@ void mylib::CLanDummy::Stop()
 	LOG(L"SYSTEM", LOG_DEBUG, L"Client Stop");
 }
 
-mylib::CLanDummy::stSESSION * mylib::CLanDummy::ConnectSession(int nIndex)
+bool mylib::CLanDummy::ConnectSession(int nIndex)
 {
 	stSESSION * pSession = &_arrSession[nIndex];
-	pSession->lStatus = stSESSION::enSTAT::en_CONNECT;
-
 	InterlockedIncrement64(&_lConnectTryTps);
 
 	pSession->Socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (pSession->Socket == INVALID_SOCKET)
 	{
 		LOG(L"SYSTEM", LOG_ERROR, L"socket() failed %d", WSAGetLastError());
+		InterlockedIncrement64(&_lConnectFailCnt);
 		return false;
 	}
 	
@@ -165,14 +163,16 @@ mylib::CLanDummy::stSESSION * mylib::CLanDummy::ConnectSession(int nIndex)
 		// WSAECONNRESET(10054) : 원격 호스트에 의해 기존 연결 강제 해제. 원격 호스트가 갑자기 중지되거나 다시 시작되거나 하드 종료를 사용하는 경우
 		// WSAESHUTDOWN(10058) : 소켓 종료 후 전송
 		// WSAECONNREFUSED(10061) : 서버 연결 거부
-		if (err != 10038 && err != 10053 && err != 10054 && err != 10058 && err != 10061)
+		// WSAEINVAL(10022) : 바인딩 실패. 이미 bind된 소켓에 바인드하거나 주소체계가 일관적이지 않을 때 
+		//					 -> TODO:링거옵션으로 TIME_WAIT을 없애서 간혹 소켓이 재사용되는듯?
+		if (err != 10038 && err != 10053 && err != 10054 && err != 10058 && err != 10061 && err != 10022)
 		{
-			// WSAEINVAL(10022) : 바인딩 실패. 이미 bind된 소켓에 바인드하거나 주소체계가 일관적이지 않을 때
 			// WSAEISCONN(10056) : 이미 연결이 완료된 소켓임. connect로 연결이 완료된 소켓에 다시 connect를 시도할 경우
 			LOG(L"SYSTEM", LOG_ERROR, L"connect() failed %d", err);
+			InterlockedIncrement64(&_lConnectFailCnt);
 		}
-
-		return nullptr;
+		closesocket(pSession->Socket);
+		return false;
 	}
 
 	InterlockedIncrement64(&_lConnectCnt);
@@ -186,17 +186,18 @@ mylib::CLanDummy::stSESSION * mylib::CLanDummy::ConnectSession(int nIndex)
 	pSession->iSendPacketCnt = 0;
 	pSession->bSendDisconnect = FALSE;
 
+	pSession->lLastEcho = -1;
 	pSession->lLastLoginTick = pSession->lLastRecvTick = GetTickCount64();
-	pSession->stkEcho.Clear();
+	pSession->qEcho.Clear();
 
-	if (CreateIoCompletionPort((HANDLE)pSession->Socket, _hIOCP, (ULONG_PTR)pSession, 0) == NULL)
+	if (CreateIoCompletionPort(reinterpret_cast<HANDLE>(pSession->Socket), _hIOCP, reinterpret_cast<ULONG_PTR>(pSession), 0) == NULL)
 	{
 		//  HANDLE 인자에 소켓이 아닌 값이 올 경우 잘못된 핸들(6번 에러) 발생. 
-		// 소켓이 아닌 값을 넣었다는 것은 다른 스레드에서 소켓을 반환했다는 의미이므로  동기화 문제일 가능성이 높다.
+		// 소켓이 아닌 값을 넣었다는 것은 다른 스레드에서 소켓을 반환했다는 의미이므로 동기화 문제일 가능성이 높다.
 		LOG(L"SYSTEM", LOG_ERROR, L"Session IOCP Enrollment failed %d", WSAGetLastError());
 		if (InterlockedDecrement64(&pSession->stIO->iCnt) == 0)
 			ReleaseSession(pSession);
-		return nullptr;
+		return false;
 	}
 
 	pSession->stIO->bRelease = FALSE;
@@ -210,10 +211,10 @@ mylib::CLanDummy::stSESSION * mylib::CLanDummy::ConnectSession(int nIndex)
 	if (InterlockedDecrement64(&pSession->stIO->iCnt) == 0)
 	{
 		ReleaseSession(pSession);
-		return nullptr;
+		return false;
 	}
 
-	return pSession;
+	return true;
 }
 
 void mylib::CLanDummy::DisconnectSession(SOCKET socket)
@@ -308,11 +309,13 @@ void mylib::CLanDummy::ReleaseSessionFree(stSESSION * pSession)
 
 bool mylib::CLanDummy::ReleaseSession(stSESSION * pSession)
 {
+	pSession->lStatus = stSESSION::enSTAT::en_RELEASE;
+
 	stIOREF stComparentIO(0, FALSE);
 	if (!InterlockedCompareExchange128((LONG64*)pSession->stIO, TRUE, 0, (LONG64*)&stComparentIO))
 		return false;
 
-	pSession->lStatus = stSESSION::enSTAT::en_RELEASE;
+	AcquireSRWLockExclusive(&pSession->pThreadInfo->srwSessionLock);
 
 	// TODO : shutdown()
 	//  shutdown() 함수는 4HandShake(1Fin - 2Ack+3Fin - 4Fin)에서 1Fin을 보내는 함수
@@ -340,10 +343,11 @@ bool mylib::CLanDummy::ReleaseSession(stSESSION * pSession)
 	InterlockedExchange(&pSession->bSendFlag, FALSE);
 	pSession->iSessionID = -1;
 	pSession->Socket = INVALID_SOCKET;
-	pSession->stkEcho.Clear();
-	_stkSession.Push(pSession->nIndex);
+	pSession->qEcho.Clear();
 	InterlockedDecrement64(&_lConnectCnt);
+	pSession->lStatus = stSESSION::enSTAT::en_CONNECT;
 
+	ReleaseSRWLockExclusive(&pSession->pThreadInfo->srwSessionLock);
 	return true;
 }
 
@@ -565,7 +569,7 @@ unsigned int mylib::CLanDummy::MonitorThread(LPVOID pCLanDummy)
 unsigned int mylib::CLanDummy::UpdateThread(LPVOID pThreadInfo)
 {
 	CLanDummy * pCLanDummy = ((stTHREAD_INFO *)pThreadInfo)->pThisClass;
-	return pCLanDummy->UpdateThread_Process(((stTHREAD_INFO *)pThreadInfo)->iSessionMax);
+	return pCLanDummy->UpdateThread_Process((stTHREAD_INFO *)pThreadInfo);
 }
 
 
@@ -579,75 +583,86 @@ unsigned int mylib::CLanDummy::MonitorThread_Process()
 	return 0;
 }
 
-unsigned int mylib::CLanDummy::UpdateThread_Process(int iSessionMax)
+unsigned int mylib::CLanDummy::UpdateThread_Process(stTHREAD_INFO * pInfo)
 {
-	std::vector<stSESSION*> vtSession;
-	vtSession.clear();
+	int iSessionMax = pInfo->vtSession.size();
+	CLFStack<int>			stkConnectSession;
+	std::vector<stSESSION*> vtSendSession;
 
+	for (auto iter = pInfo->vtSession.begin(); iter != pInfo->vtSession.end(); ++iter)
+		stkConnectSession.Push((*iter)->nIndex);
+	
+	int nIndex;
 	while (_bServerOn)
 	{
 		// Connect
-		if (vtSession.size() < iSessionMax)
+		if (vtSendSession.size() < iSessionMax)
 		{
-			int nIndex = -1;
-			stSESSION * pSession;
-			if (_stkSession.Pop(nIndex))
+			nIndex = -1;
+			while (stkConnectSession.Pop(nIndex) && _bServerOn)
 			{
-				pSession = ConnectSession(nIndex);
-				if (pSession != nullptr)
+				stSESSION * pSession = &_arrSession[nIndex];
+				if (pSession->lStatus == stSESSION::enSTAT::en_CONNECT
+					&& !pSession->bSendFlag && !pSession->qEcho.GetUseSize())
 				{
-					InterlockedIncrement64(&_lConnectSuccessTps);
-					vtSession.push_back(pSession);
-					pSession->lStatus = stSESSION::enSTAT::en_SEND;
+					if (ConnectSession(nIndex))
+					{
+						InterlockedIncrement64(&_lConnectSuccessTps);
+
+						AcquireSRWLockExclusive(&pSession->pThreadInfo->srwSessionLock);
+						vtSendSession.push_back(pSession);
+						ReleaseSRWLockExclusive(&pSession->pThreadInfo->srwSessionLock);
+
+						pSession->lStatus = stSESSION::enSTAT::en_SEND;
+					}
+					else
+					{
+						stkConnectSession.Push(nIndex);
+					}
 				}
-				else
-				{
-					InterlockedIncrement64(&_lConnectFailCnt);
-					_stkSession.Push(nIndex);
-				}
+				
 			}
 		}
 
+
 		// Send
-		if (_bSendEcho)
+		AcquireSRWLockExclusive(&pInfo->srwSessionLock);
+		for (auto iter = vtSendSession.begin(); iter != vtSendSession.end(); /*++iter*/)
 		{
-			for (auto iter = vtSession.begin(); iter != vtSession.end(); /*++iter*/)
+			stSESSION * pSession = *iter;
+			if (!pSession->qEcho.GetUseSize())
 			{
-				stSESSION * pSession = *iter;
-				if (!pSession->stkEcho.GetUseSize())
+				if (pSession->lStatus == stSESSION::enSTAT::en_DISCONNECT)
 				{
-					if (pSession->lStatus == stSESSION::enSTAT::en_SEND)
-					{
-						OnEcho(pSession);
-						//if (_bDisconnect && GetTickCount64() - pSession->lLastLoginTick >= _iDisconnectDelay)
-						//	pSession->lStatus = stSESSION::enSTAT::en_DISCONNECT;
-					}
+					iter = vtSendSession.erase(iter);
+					DisconnectSession(pSession->Socket);
+					stkConnectSession.Push(pSession->nIndex);
+					continue;
 				}
-				++iter;
-			}
-		}
-		
-		// Disconnect
-		if (_bDisconnect)
-		{
-			for (auto iter = vtSession.begin(); iter != vtSession.end();)
-			{
-				stSESSION * pSession = *iter;
-				if (!pSession->stkEcho.GetUseSize())
+
+				if (_bSendEcho && pSession->lStatus == stSESSION::enSTAT::en_SEND)
 				{
-					if (pSession->lStatus == stSESSION::enSTAT::en_DISCONNECT)
-					{
-						DisconnectSession(pSession->Socket);
-						iter = vtSession.erase(iter);
-						continue;
-					}
+					OnEcho(pSession);
 				}
-				++iter;
 			}
+			++iter;
 		}
+		ReleaseSRWLockExclusive(&pInfo->srwSessionLock);
 
 		InterlockedIncrement64(&_lThreadLoopTps);
 		Sleep(_iLoopDelay);
+	}
+
+	for (auto iter = pInfo->vtSession.begin(); iter != pInfo->vtSession.end();)
+	{
+		stSESSION * pSession = *iter;
+		if (InterlockedDecrement64(&pSession->stIO->iCnt) == 0)
+			ReleaseSession(pSession);
+
+		WaitForSingleObject(reinterpret_cast<HANDLE*>(&pSession->Socket), INFINITE);
+		wprintf(L"%d Session Disconnect Success\n", pSession->nIndex);
+
+		iter = pInfo->vtSession.erase(iter);
 	}
 
 	return 0;
@@ -741,6 +756,7 @@ mylib::CLanDummy::stSESSION::stSESSION()
 	iSendPacketCnt = 0;
 	bSendDisconnect = FALSE;
 
+	lLastEcho = -1;
 	lLastLoginTick = 0;
 	lLastRecvTick = 0;
 	lStatus = enSTAT::en_CONNECT;

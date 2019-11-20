@@ -62,8 +62,9 @@ namespace mylib
 
 		
 	protected:
+		struct stTHREAD_INFO;
 		struct stSESSION;
-		stSESSION * ConnectSession(int nIndex);
+		bool ConnectSession(int nIndex);
 		void DisconnectSession(SOCKET socket);
 
 		// External Call
@@ -131,7 +132,10 @@ namespace mylib
 			bool		bSendDisconnect;
 
 			// Echo Test
-			CLFQueue<ULONGLONG> stkEcho;
+			stTHREAD_INFO * pThreadInfo;
+			CLFQueue<ULONGLONG> qEcho;
+			ULONGLONG	lLastEcho;
+
 			ULONGLONG	lLastRecvTick; 
 			ULONGLONG	lLastLoginTick;
 			enSTAT		lStatus;
@@ -142,6 +146,7 @@ namespace mylib
 		void		ReleaseSessionFree(stSESSION* pSession);
 		bool		ReleaseSession(stSESSION* pSession);
 
+		
 		//////////////////////////////////////////////////////////////////////////
 		// Network
 		//
@@ -157,7 +162,7 @@ namespace mylib
 		static unsigned int CALLBACK UpdateThread(LPVOID pCLanDummy);
 		static unsigned int CALLBACK WorkerThread(LPVOID pCLanDummy);
 		unsigned int MonitorThread_Process();
-		unsigned int UpdateThread_Process(int iSessionMax);
+		unsigned int UpdateThread_Process(stTHREAD_INFO * pInfo);
 		unsigned int WorkerThread_Process();
 
 		//////////////////////////////////////////////////////////////////////////
@@ -177,7 +182,8 @@ namespace mylib
 		struct stTHREAD_INFO
 		{
 			CLanDummy * pThisClass;
-			int iSessionMax;
+			SRWLOCK srwSessionLock;
+			std::vector<stSESSION*> vtSession;
 		};
 		stTHREAD_INFO *		_arrThreadInfo;
 		int					_iWorkerThreadMax;
@@ -186,11 +192,10 @@ namespace mylib
 		HANDLE*				_hWorkerThread;
 		HANDLE*				_hUpdateThread;
 		LONG64 _nData;
+
 		// Session
 		stSESSION*			_arrSession;
 		UINT64				_iSessionID;
-		CLFStack<int>		_stkSession;	// 后 技记 历厘侩 Freelist
-
 		LONG64				_lConnectMax;
 
 	public:

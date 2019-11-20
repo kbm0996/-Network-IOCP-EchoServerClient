@@ -56,10 +56,6 @@ void CEchoDummy::PrintState()
 
 void CEchoDummy::OnClientJoin(UINT64 iSessionID)
 {
-	//stSESSION * pSession = &_arrSession[GetSessionIndex(iSessionID)];
-	//pSession->stkEcho.Clear();
-	//pSession->lLastRecvTick = GetTickCount64();
-	//pSession->lLastLoginTick = GetTickCount64();
 }
 
 void CEchoDummy::OnClientLeave(UINT64 iSessionID)
@@ -87,12 +83,19 @@ void CEchoDummy::OnRecv(UINT64 iSessionID, mylib::CNPacket * pPacket)
 	stSESSION * pSession = &_arrSession[GetSessionIndex(iSessionID)];
 
 	ULONGLONG nData_out;
-	pSession->stkEcho.Dequeue(nData_out);
+	pSession->qEcho.Dequeue(nData_out);
 
 	if (lCurRecvTick - pSession->lLastRecvTick > 500 )
 		InterlockedIncrement64(&_lError_EchoNotRecv);
+
 	if (nData_out != nData)
 		InterlockedIncrement64(&_lError_PacketErr);
+
+	if (pSession->lLastEcho == nData)
+	{
+		if (_bDisconnect && GetTickCount64() - pSession->lLastLoginTick > _iDisconnectDelay)
+			pSession->lStatus = stSESSION::enSTAT::en_DISCONNECT;
+	}
 
 	pSession->lLastRecvTick = lCurRecvTick;
 }
@@ -107,6 +110,8 @@ void CEchoDummy::OnError(int iErrCode, WCHAR * wszErr)
 
 void CEchoDummy::OnEcho(stSESSION * pSession)
 {
+	UINT64 lPrecode = df_PACKET_PRECODE;
+	ULONGLONG nData;
 	for (int i = 0; i < _iOversendCnt; ++i)
 	{
 		mylib::CNPacket * pOnPacket = mylib::CNPacket::Alloc();
@@ -117,15 +122,16 @@ void CEchoDummy::OnEcho(stSESSION * pSession)
 		//		unsigned long long	nData
 		//	}
 		//------------------------------------------------------------
-		UINT64 lPrecode = df_PACKET_PRECODE;
-		ULONGLONG nData = InterlockedIncrement64(&_nData);
+		nData = InterlockedIncrement64(&_nData);
 		*pOnPacket << lPrecode;
 		*pOnPacket << nData;
 
-		pSession->stkEcho.Enqueue(nData);
+		pSession->qEcho.Enqueue(nData);
 
 		SendPacket(pSession->iSessionID, pOnPacket);
 
 		pOnPacket->Free();
 	}
+
+	pSession->lLastEcho = nData;
 }
