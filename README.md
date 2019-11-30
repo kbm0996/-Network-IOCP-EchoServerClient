@@ -155,4 +155,4 @@ int main(int argc, char* argv[])
  ```
  함수 실패시 *lpOverlapped의 값이 NULL으로 변한다. 하지만, 실패시엔 Transferred, Key 인자의 값이 변하지 않기 때문에 재활용시 예전의 값을 갖고있을 수 있다. 따라서, 초기화가 필수적이다.
 
- 응용 프로그램이 작업자 스레드에 특별한 사실을 알리기 위해 직접 입출력 완료 패킷을 생성할 수도 있다. 이때 사용하는 함수는 PostQueuedCompletionStatus()다.
+ 응용 프로그램이 작업자 스레드에 특별한 사실을 알리기 위해 직접 입출력 완료 패킷을 생성할 수도 있다. 이때 사용하는 함수는 PostQueuedCompletionStatus()다.
