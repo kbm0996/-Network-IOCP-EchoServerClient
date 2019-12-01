@@ -2,14 +2,6 @@
 ## 📢 개요
  IOCP(입출력 완료 포트; I/O completion port) 에코 서버/클라이언트
 
-## 💻 간
-
- 다
-
-  ![capture](주)
-  
-  **figure 1. 제*
-
 ## 📌 동작 원리
 
 ### 생성과 파괴
@@ -26,9 +18,7 @@
 
   IOCP에 저장된 결과를 처리하려면 작업자 스레드는 GetQueuedCompletionStatus() 함수를 호출해야 한다. (이 때, 작업자 스레드가가 여러개 있어도 하나만 깨어난다)
  
-  ![capture](주)
-  
-  **figure 2. 제*
+  ![capture](https://github.com/kbm0996/-Network-IOCP-EchoServerClient/blob/master/figure/2.png)
  
 ① 임의의 스레드에서 비동기 입출력 함수를 호출하여 OS에 입출력 작업 요청.
 
@@ -41,16 +31,12 @@
 
 처음 시작할 때는 다음 그림과 같이 실행된다.
 
-  ![capture](주)
+  ![capture](https://github.com/kbm0996/-Network-IOCP-EchoServerClient/blob/master/figure/3.png)
   
-  **figure 3. 제*
-
 
 작업자 스레드에서 새로운 비동기 입출력을 시작하면 다음 그림과 같이 진행한다.
 
-  ![capture](주)
-  
-  **figure 4. 제*
+  ![capture](https://github.com/kbm0996/-Network-IOCP-EchoServerClient/blob/master/figure/4.png)
   
 ① CreateIoCompletionPort() 함수를 호출하여 입출력 완료 포트 생성
 
